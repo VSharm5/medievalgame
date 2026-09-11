@@ -85,6 +85,9 @@ economy; the **ledger + monthly tick**; fast-forward. Everything headless and te
       is scaled to a deficit and the repair clamp **never** fires; assert **no transport double-charge**.
       - Centralize the BOUNDARY sentinel as one canonical constant (SPEC §29); Invariants currently
         defines BOUNDARY_ID locally (flagged in 0.6) — dedupe it.
+      - Define the canonical Transaction ordering/id (SPEC §7 stable-ID rule); Invariants currently
+        sorts ledger entries by an interim composite key — switch to the canonical order when the
+        ledger defines it.
 - [ ] **0.5.12 Monthly tick.** `advance_month()` FREEZE→…→ADVANCE; attractiveness/capacity as
       next-month inputs; L2/L3 asserted every month in debug. `SPEC §35`. *Gate:* Scenario **J**
       (aggregate kingdom money change ≈ −transport outflows only; nothing minted internally).

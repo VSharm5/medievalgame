@@ -37,14 +37,28 @@ class InvariantResult extends RefCounted:
 		return result
 
 
+## Interim deterministic sort key for a ledger entry (SPEC §7 stable-ID
+## ordering). Transaction has no id field yet; this composite key is a
+## stand-in until sim/tick/ledger.gd (task 0.5.11) defines the canonical
+## Transaction ordering/id — switch to that when it exists (see TODO.md).
+static func _ledger_entry_sort_key(entry: Transaction) -> String:
+	var resource_key: String = "null" if entry.resource == null else str(entry.resource)
+	return "%s|%s|%d|%s|%.17f" % [
+		entry.source, entry.destination, entry.type, resource_key, entry.gross_value,
+	]
+
+
 ## L1 — ledger completeness (SPEC §29 Invariant L1, §43): every wealth
 ## change traces to exactly one settled ledger entry. Checked here as: for
 ## every settlement, the sum of its ledger entries (its own gross_value
-## outflows/inflows) equals its declared wealth_delta_month exactly — no
-## unaccounted wealth movement, no double-counted entry.
+## outflows/inflows) equals its declared wealth_delta_month exactly — a
+## settlement legitimately has many entries per month, so this is a netted
+## sum, not a one-entry-per-settlement check. Also rejects, as a violation
+## (not a silent skip), any entry whose source or destination is
+## non-BOUNDARY but not a known settlement id.
 ##
-## `settlements` must be supplied in stable-ID order (SPEC §7); this
-## function does not sort — sorting is the caller's responsibility.
+## Ledger entries are sorted here by an interim deterministic key (SPEC §7)
+## before summing, so the result does not depend on caller-supplied order.
 static func check_l1_ledger_completeness(
 	settlements: Array[SettlementState],
 	ledger_entries: Array[Transaction],
@@ -53,10 +67,24 @@ static func check_l1_ledger_completeness(
 	for settlement: SettlementState in settlements:
 		ledger_delta_by_settlement[settlement.id] = 0.0
 
-	for entry: Transaction in ledger_entries:
-		if entry.source != BOUNDARY_ID and ledger_delta_by_settlement.has(entry.source):
+	var sorted_entries: Array[Transaction] = ledger_entries.duplicate()
+	sorted_entries.sort_custom(
+		func(a: Transaction, b: Transaction) -> bool:
+			return _ledger_entry_sort_key(a) < _ledger_entry_sort_key(b)
+	)
+
+	for entry: Transaction in sorted_entries:
+		if entry.source != BOUNDARY_ID:
+			if not ledger_delta_by_settlement.has(entry.source):
+				return InvariantResult.failed(
+					"L1: ledger entry references unknown settlement id '%s' (source)" % entry.source
+				)
 			ledger_delta_by_settlement[entry.source] -= entry.gross_value
-		if entry.destination != BOUNDARY_ID and ledger_delta_by_settlement.has(entry.destination):
+		if entry.destination != BOUNDARY_ID:
+			if not ledger_delta_by_settlement.has(entry.destination):
+				return InvariantResult.failed(
+					"L1: ledger entry references unknown settlement id '%s' (destination)" % entry.destination
+				)
 			ledger_delta_by_settlement[entry.destination] += entry.gross_value
 
 	for settlement: SettlementState in settlements:
@@ -81,10 +109,19 @@ static func check_l1_ledger_completeness(
 ## `kingdom_money_delta` is a derived ledger-level output (SPEC §29 step
 ## DERIVE) with no home yet in WorldState/SettlementState — it is supplied
 ## by the caller, not computed here.
+##
+## Settlements are sorted here by id (SPEC §7 stable-ID ordering) before
+## summing, so the result does not depend on caller-supplied order.
 static func check_l2_conservation(
 	settlements: Array[SettlementState],
 	kingdom_money_delta: float,
 ) -> InvariantResult:
+	var sorted_settlements: Array[SettlementState] = settlements.duplicate()
+	sorted_settlements.sort_custom(
+		func(a: SettlementState, b: SettlementState) -> bool:
+			return a.id < b.id
+	)
+
 	var total_goods_revenue: float = 0.0
 	var total_goods_import_cost: float = 0.0
 	var total_service_income: float = 0.0
@@ -95,7 +132,7 @@ static func check_l2_conservation(
 	var total_foreign_visitor_income: float = 0.0
 	var total_transport_cost_paid: float = 0.0
 
-	for settlement: SettlementState in settlements:
+	for settlement: SettlementState in sorted_settlements:
 		total_goods_revenue += settlement.domestic_goods_revenue
 		total_goods_import_cost += settlement.domestic_goods_import_cost
 		total_service_income += settlement.domestic_service_income

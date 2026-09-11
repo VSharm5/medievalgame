@@ -58,6 +58,47 @@ func test_l1_fails_when_wealth_delta_is_unaccounted() -> void:
 	assert_string_contains(result.reason, "SELLER")
 
 
+func test_l1_fails_on_entry_referencing_unknown_settlement() -> void:
+	var seller: SettlementState = _make_settlement("SELLER")
+	seller.wealth_delta_month = 5.0
+
+	# "GHOST" is not a known settlement and not BOUNDARY -- this must be a
+	# violation, not a silently dropped entry.
+	var entries: Array[Transaction] = [_make_transaction("GHOST", "SELLER", 5.0)]
+
+	var result: Invariants.InvariantResult = Invariants.check_l1_ledger_completeness(
+		[seller], entries
+	)
+	assert_false(result.ok, "L1 should fail when an entry references an unknown settlement id")
+	assert_string_contains(result.reason, "GHOST")
+
+
+func test_l1_result_is_order_independent() -> void:
+	# Magnitudes are chosen so that summation order actually changes the
+	# floating-point result (catastrophic cancellation), not just a
+	# reordering that happens to sum identically either way: adding 1.0 to
+	# a running total of 1e20 is completely absorbed (no representable
+	# change at that magnitude), so "big, tiny, big-negative" nets to 0.0
+	# while "big, big-negative, tiny" nets to 1.0 -- a real, >>epsilon
+	# difference that only a canonical (sorted) processing order avoids.
+	var s: SettlementState = _make_settlement("S")
+	s.wealth_delta_month = 0.0  # the canonical, sorted-order answer
+
+	var entry_big_in: Transaction = _make_transaction(Invariants.BOUNDARY_ID, "S", 1e20)
+	var entry_tiny_in: Transaction = _make_transaction(Invariants.BOUNDARY_ID, "S", 1.0)
+	var entry_big_out: Transaction = _make_transaction("S", Invariants.BOUNDARY_ID, 1e20)
+
+	var order_a: Array[Transaction] = [entry_big_in, entry_tiny_in, entry_big_out]
+	var order_b: Array[Transaction] = [entry_big_in, entry_big_out, entry_tiny_in]
+
+	var result_a: Invariants.InvariantResult = Invariants.check_l1_ledger_completeness([s], order_a)
+	var result_b: Invariants.InvariantResult = Invariants.check_l1_ledger_completeness([s], order_b)
+
+	assert_true(result_a.ok, "L1 should pass under canonical ordering: %s" % result_a.reason)
+	assert_eq(result_a.ok, result_b.ok, "L1 result.ok should not depend on input order")
+	assert_eq(result_a.reason, result_b.reason, "L1 result.reason should not depend on input order")
+
+
 # ---------------------------------------------------------------------------
 # L2 — conservation
 # ---------------------------------------------------------------------------
@@ -133,6 +174,34 @@ func test_l2_fails_outside_epsilon_tolerance() -> void:
 		settlements, kingdom_money_delta
 	)
 	assert_false(result.ok, "L2 should fail on an out-of-epsilon mismatch")
+
+
+func test_l2_result_is_order_independent() -> void:
+	# Same catastrophic-cancellation trick as the L1 order test: magnitudes
+	# chosen so summation order changes the float result by way more than
+	# epsilon, not a reordering that happens to sum identically either way.
+	# domestic_goods_import_cost is 0.0 for all three (order-insensitive),
+	# so the check's pass/fail hinges entirely on how domestic_goods_revenue
+	# sums -- 0.0 (absorbed) if id-sorted "A, B, C", 1.0 if summed as
+	# "A, C, B" without sorting.
+	var settlement_a: SettlementState = _make_settlement("A")
+	settlement_a.domestic_goods_revenue = 1e20
+
+	var settlement_b: SettlementState = _make_settlement("B")
+	settlement_b.domestic_goods_revenue = 1.0
+
+	var settlement_c: SettlementState = _make_settlement("C")
+	settlement_c.domestic_goods_revenue = -1e20
+
+	var order_a: Array[SettlementState] = [settlement_a, settlement_b, settlement_c]
+	var order_b: Array[SettlementState] = [settlement_a, settlement_c, settlement_b]
+
+	var result_a: Invariants.InvariantResult = Invariants.check_l2_conservation(order_a, 0.0)
+	var result_b: Invariants.InvariantResult = Invariants.check_l2_conservation(order_b, 0.0)
+
+	assert_true(result_a.ok, "L2 should pass under canonical (id-sorted) ordering: %s" % result_a.reason)
+	assert_eq(result_a.ok, result_b.ok, "L2 result.ok should not depend on input order")
+	assert_eq(result_a.reason, result_b.reason, "L2 result.reason should not depend on input order")
 
 
 # ---------------------------------------------------------------------------
