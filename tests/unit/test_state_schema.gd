@@ -23,12 +23,61 @@ func _assert_resource_float_dict(dict: Variant, label: String) -> void:
 		assert_typeof(dict.get(resource), TYPE_FLOAT, "%s[%s]" % [label, resource])
 
 
+## Compares an object's ACTUAL declared script variables (filtered by
+## PROPERTY_USAGE_SCRIPT_VARIABLE, which excludes built-in Object/RefCounted
+## properties and script internals) against a hand-authored canonical name
+## set. Fails on a missing canonical field OR an extra, uncanonical one --
+## the latter catches an invented field / synonym that the per-field
+## assertions above would silently miss (AGENTS.md §6, SPEC §38).
+func _assert_exact_field_set(obj: Object, canonical_fields: Array[String], label: String) -> void:
+	var actual_fields: Array[String] = []
+	for prop: Dictionary in obj.get_property_list():
+		if prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			actual_fields.append(prop.name)
+
+	var canonical_set: Dictionary[String, bool] = {}
+	for field_name: String in canonical_fields:
+		canonical_set[field_name] = true
+
+	var actual_set: Dictionary[String, bool] = {}
+	for field_name: String in actual_fields:
+		actual_set[field_name] = true
+
+	for field_name: String in actual_fields:
+		assert_true(
+			canonical_set.has(field_name),
+			"%s declares field '%s' which is NOT in the canonical SPEC field set" % [label, field_name]
+		)
+	for field_name: String in canonical_fields:
+		assert_true(
+			actual_set.has(field_name),
+			"%s is missing canonical field '%s'" % [label, field_name]
+		)
+
+
 # ---------------------------------------------------------------------------
 # SettlementState — SPEC §38
 # ---------------------------------------------------------------------------
 
 func test_settlement_state_schema() -> void:
 	var s: SettlementState = SettlementState.new()
+
+	_assert_exact_field_set(s, [
+		"id", "name", "map_position",
+		"echelon", "is_kingdom_capital",
+		"nominal_workforce", "productive_workforce",
+		"wealth", "wealth_delta_month",
+		"stockpiles", "production_rates", "consumption_rates", "imports", "exports",
+		"domestic_goods_revenue", "domestic_goods_import_cost",
+		"domestic_service_income", "domestic_service_spending",
+		"external_export_revenue", "external_import_cost",
+		"foreign_visitor_income", "transport_cost_paid",
+		"mandatory_status", "wants_status",
+		"export_capacity", "export_capacity_used",
+		"service_capacity", "service_utilization", "attractiveness", "traffic",
+		"disposable_income", "discretionary_budget",
+		"catchment_radius", "projected_treasury_zero",
+	], "SettlementState")
 
 	assert_typeof(s.id, TYPE_STRING, "SettlementState.id")
 	assert_typeof(s.name, TYPE_STRING, "SettlementState.name")
@@ -63,6 +112,7 @@ func test_settlement_state_schema() -> void:
 		assert_true(s.mandatory_status.has(resource), "mandatory_status missing entry for resource %s" % resource)
 		var entry: Variant = s.mandatory_status.get(resource)
 		assert_true(entry is SettlementState.MandatoryStatus, "mandatory_status[%s] should be a MandatoryStatus" % resource)
+		_assert_exact_field_set(entry, ["covered", "months_to_zero"], "MandatoryStatus")
 		assert_typeof(entry.covered, TYPE_BOOL, "MandatoryStatus.covered")
 		assert_typeof(entry.months_to_zero, TYPE_FLOAT, "MandatoryStatus.months_to_zero")
 
@@ -86,6 +136,15 @@ func test_settlement_state_schema() -> void:
 
 func test_world_state_schema() -> void:
 	var w: WorldState = WorldState.new()
+
+	_assert_exact_field_set(w, [
+		"world_id", "world_name",
+		"simulation_year", "simulation_month",
+		"paused", "speed",
+		"map_asset", "simulation_grid",
+		"settlements", "trade_routes", "external_economy", "recommendations",
+		"economic_version", "random_seed",
+	], "WorldState")
 
 	assert_typeof(w.world_id, TYPE_STRING, "WorldState.world_id")
 	assert_typeof(w.world_name, TYPE_STRING, "WorldState.world_name")
@@ -112,12 +171,18 @@ func test_world_state_schema() -> void:
 func test_trade_route_and_endpoint_schema() -> void:
 	var r: TradeRoute = TradeRoute.new()
 
+	_assert_exact_field_set(r, [
+		"id", "source_endpoint", "destination_endpoint", "cargo", "nodes", "active",
+		"distance", "transport_cost", "net_trade_value",
+	], "TradeRoute")
+
 	assert_typeof(r.id, TYPE_STRING, "TradeRoute.id")
 
 	r.source_endpoint = TradeRoute.TradeEndpoint.new()
 	r.destination_endpoint = TradeRoute.TradeEndpoint.new()
 	assert_true(r.source_endpoint is TradeRoute.TradeEndpoint, "TradeRoute.source_endpoint")
 	assert_true(r.destination_endpoint is TradeRoute.TradeEndpoint, "TradeRoute.destination_endpoint")
+	_assert_exact_field_set(r.source_endpoint, ["type", "id"], "TradeEndpoint")
 	assert_true(r.source_endpoint.type is int, "TradeEndpoint.type should be an EndpointType enum value")
 	assert_typeof(r.source_endpoint.id, TYPE_STRING, "TradeEndpoint.id")
 
@@ -127,6 +192,7 @@ func test_trade_route_and_endpoint_schema() -> void:
 	item.quantity_per_month = 12.0
 	r.cargo.append(item)
 	assert_true(r.cargo[0] is TradeRoute.CargoItem, "TradeRoute.cargo[] entries should be CargoItem")
+	_assert_exact_field_set(r.cargo[0], ["resource", "quantity_per_month"], "CargoItem")
 	assert_true(r.cargo[0].resource is int, "CargoItem.resource should be a ResourceType enum value")
 	assert_typeof(r.cargo[0].quantity_per_month, TYPE_FLOAT, "CargoItem.quantity_per_month")
 
@@ -145,6 +211,8 @@ func test_trade_route_and_endpoint_schema() -> void:
 func test_external_market_schema() -> void:
 	var m: ExternalMarket = ExternalMarket.new()
 
+	_assert_exact_field_set(m, ["id", "map_position", "price_list"], "ExternalMarket")
+
 	assert_typeof(m.id, TYPE_STRING, "ExternalMarket.id")
 	assert_typeof(m.map_position, TYPE_VECTOR2, "ExternalMarket.map_position")
 	assert_true(m.price_list is Dictionary, "ExternalMarket.price_list should be a Dictionary")
@@ -156,6 +224,12 @@ func test_external_market_schema() -> void:
 
 func test_resource_fields_schema() -> void:
 	var f: ResourceFields = ResourceFields.new()
+
+	_assert_exact_field_set(f, [
+		"grid_width", "grid_height",
+		"moisture", "fertility", "forestability", "rockiness", "mineralization", "dryness", "elevation",
+		"potential",
+	], "ResourceFields")
 
 	assert_typeof(f.grid_width, TYPE_INT, "ResourceFields.grid_width")
 	assert_typeof(f.grid_height, TYPE_INT, "ResourceFields.grid_height")
@@ -180,6 +254,10 @@ func test_resource_fields_schema() -> void:
 
 func test_transaction_schema() -> void:
 	var t: Transaction = Transaction.new()
+
+	_assert_exact_field_set(t, [
+		"type", "source", "destination", "resource", "quantity", "gross_value", "boundary_flag",
+	], "Transaction")
 
 	assert_true(t.type is int, "Transaction.type should be a TransactionType enum value")
 	assert_typeof(t.source, TYPE_STRING, "Transaction.source")
