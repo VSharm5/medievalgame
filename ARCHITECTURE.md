@@ -122,9 +122,11 @@ clamp firing*) every month in debug builds. A failure is an implementation bug, 
   `OS`, `Engine.get_frames_per_second`, no `hash()`-order-dependent iteration, no threads accumulating
   floats. `random_seed` exists in state but is **reserved and unused** in V1.
 - **Typed GDScript everywhere in `sim/`.** Static typing catches a class of agent errors at parse time
-  and satisfies `SPEC §47` "typed data." Enable strict typing warnings as errors for `sim/`
+  and satisfies `SPEC §47` "typed data." Enable strict typing warnings as errors project-wide
   (`project.godot` → `debug/gdscript/warnings`: treat `UNTYPED_DECLARATION` and
-  `INFERRED_DECLARATION` as errors at minimum).
+  `INFERRED_DECLARATION` as errors at minimum). Godot has no per-directory GDScript warning
+  configuration, so this setting applies to the whole project, not just `sim/`; `presentation/`,
+  `ui/`, etc. inherit the same strictness as a side effect.
 - **Fixed monthly step.** The sim advances in discrete months; UI animation/interpolation lives in
   `presentation/` and never feeds back into authoritative state.
 - **Floats.** GDScript `float` is 64-bit double; keep all economic math in doubles and never mix in

@@ -106,7 +106,7 @@ All tunables live in central config, never in code paths (`SPEC §50`). Never ha
 
 ```bash
 # Full headless test suite (GUT). The sim core must run with no renderer.
-godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
+godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit
 
 # Run one deterministic benchmark scenario headless (e.g. Scenario L, SPEC §45)
 godot --headless --path . -s res://tools/run_scenario.gd -- --scenario=L --months=600
