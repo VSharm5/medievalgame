@@ -25,6 +25,12 @@ const FOREIGN_VISITOR_DEMAND: float = 100.0
 # PLACEHOLDER, unvalidated, calibrate vs §45
 const EXTERNAL_MARKET_ACCESSIBILITY: float = 1.0
 
+# PLACEHOLDER — numerical tolerance for float-equality comparisons in the
+# monetary invariant checks (SPEC §43). Not an economic tuning value; only
+# needs to be small relative to gross_value magnitudes, not calibrated
+# against §45 benchmark behavior.
+const INVARIANT_EPSILON: float = 1e-6
+
 # PLACEHOLDER, unvalidated, calibrate vs §45 — same value for every resource.
 const PRODUCTIVITY_CONSTANT: Dictionary[SimEnums.ResourceType, float] = {
 	SimEnums.ResourceType.FOOD: 1.0,

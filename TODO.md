@@ -58,6 +58,9 @@ economy; the **ledger + monthly tick**; fast-forward. Everything headless and te
 - [ ] **0.5.4 Stockpiles.** `clamp(…, 0, capacity)`; never negative; full → overflow wasted, workforce
       unchanged. `SPEC §17`. *Gate:* self-sufficient hamlet fills, wastes overflow, stays stable
       (Scenario **A**).
+      - storage_capacity (SPEC §17) has no home — not in SettlementState (§38) or config. Decide
+        where it lives (likely echelon-derived config, possibly per-resource) before implementing
+        the stockpile clamp. check_l3 currently takes it as a parameter (flagged in 0.6).
 - [ ] **0.5.5 Distance & transport.** Euclidean, symmetric; external-market distance; transport =
       `qty × burden × distance × k`. `SPEC §20, §21`. *Gate:* burden/distance/quantity scaling tests.
 - [ ] **0.5.6 Export capacity + deterministic allocation.** Shared domestic/external pool; category
@@ -80,6 +83,8 @@ economy; the **ledger + monthly tick**; fast-forward. Everything headless and te
       `SPEC §29, §35`. *Gate (critical):* **L1** completeness, **L2** conservation, **L3** — the
       **affordability regression test**: construct an unaffordable mandatory import, assert the buyer
       is scaled to a deficit and the repair clamp **never** fires; assert **no transport double-charge**.
+      - Centralize the BOUNDARY sentinel as one canonical constant (SPEC §29); Invariants currently
+        defines BOUNDARY_ID locally (flagged in 0.6) — dedupe it.
 - [ ] **0.5.12 Monthly tick.** `advance_month()` FREEZE→…→ADVANCE; attractiveness/capacity as
       next-month inputs; L2/L3 asserted every month in debug. `SPEC §35`. *Gate:* Scenario **J**
       (aggregate kingdom money change ≈ −transport outflows only; nothing minted internally).
