@@ -32,6 +32,8 @@ oracles in place *before* the solver exists.
       `tests/invariants/` wiring them, initially against trivial fixtures. `SPEC §43`.
 - [ ] **0.7 Save/load foundation + round-trip test.** JSON package, versioned; load reproduces
       identical state incl. external economy. `SPEC §41`. *Gate:* round-trip equality test.
+      - Must initialize WorldState.simulation_year/simulation_month to the epoch (1, 1); a raw
+        WorldState.new() defaults to (0,0), one month before the clock's epoch (flagged in 0.4).
 - [ ] **0.8 Determinism harness.** Run a fixed decision sequence twice; assert serialized end-state is
       **bit-identical**. `SPEC §7, §44`. *Gate:* determinism test green.
 
